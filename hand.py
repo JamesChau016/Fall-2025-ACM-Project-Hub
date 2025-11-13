@@ -4,6 +4,7 @@ import numpy as np
 import time
 import json
 from collections import deque
+import tkinter as tk
 
 # Initialize MediaPipe Pose and Hands
 mp_pose = mp.solutions.pose
@@ -12,10 +13,16 @@ mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 p_time = 0
 
+root=tk.Tk()
+
+#get user's resolution
+s_width=root.winfo_screenwidth()
+s_height=root.winfo_screenheight()
+
 # Initialize webcam
 cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, s_width*75/100)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, s_height*65/100)
 cap.set(cv2.CAP_PROP_FPS, 20)
 
 # FPS smoothing
