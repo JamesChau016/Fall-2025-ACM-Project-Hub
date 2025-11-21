@@ -23,7 +23,7 @@ s_height=root.winfo_screenheight()
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, s_width*75/100)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, s_height*65/100)
-cap.set(cv2.CAP_PROP_FPS, 20)
+cap.set(cv2.CAP_PROP_FPS, 30)
 
 # FPS smoothing
 fps_buffer = deque(maxlen=30)
@@ -139,7 +139,7 @@ def draw_control_overlay(image, arm_data, finger_data, handedness, w, h):
     """Draw clean overlay showing current control data"""
     # Semi-transparent background
     overlay = image.copy()
-    cv2.rectangle(overlay, (10, 10), (300, 300), (0, 0, 0), -1)
+    cv2.rectangle(overlay, (10, 10), (280, 280), (0, 0, 0), -1)
     cv2.addWeighted(overlay, 0.3, image, 0.7, 0, image)
     
     # Header
@@ -235,9 +235,11 @@ with mp_pose.Pose(
         
         # Calculate FPS
         c_time = time.time()
-        fps = 1 / (c_time - p_time)
+        fps = 1 / (c_time - p_time + 1e-6)
+        fps_buffer.append(fps)
+        avg_fps = sum(fps_buffer) / len(fps_buffer)
         p_time = c_time
-        text = f'FPS: {int(fps)}'
+        text = f'FPS: {int(fps)}, Avg: {int(avg_fps)}'
         font_w, font_h = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
         x_pos = image.shape[1] - font_w - 10   # width - text width - margin
         y_pos = image.shape[0] - 10         # height - margin
