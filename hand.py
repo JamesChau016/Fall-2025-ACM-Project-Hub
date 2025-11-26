@@ -5,6 +5,26 @@ import time
 import json
 from collections import deque
 import tkinter as tk
+import ikpy.chain
+import matplotlib.pyplot as plt
+import ikpy.utils.plot as plot_utils
+
+# Load your arm model (add after line 12)
+my_chain = ikpy.chain.Chain.from_urdf_file(
+    "Hardware/actual_arm_urdf.urdf", 
+    active_links_mask=[False, True, True, True, True, True]
+)
+
+# Initialize IK variables
+target_position = [0, 0.2, 0.1]
+target_orientation = [-1, 0, 0]
+ik = my_chain.inverse_kinematics(target_position, target_orientation, orientation_mode="Y")
+
+# Setup 3D plot (add before the main loop)
+plt.ion()  # Interactive mode
+fig, ax = plot_utils.init_3d_figure()
+fig.set_figheight(10)
+fig.set_figwidth(12)
 
 # Initialize MediaPipe Pose and Hands
 mp_pose = mp.solutions.pose
@@ -21,9 +41,10 @@ s_height=root.winfo_screenheight()
 
 # Initialize webcam
 cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, s_width*75/100)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, s_height*65/100)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, s_width*40/100)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, s_height*35/100)
 cap.set(cv2.CAP_PROP_FPS, 30)
+
 
 # FPS smoothing
 fps_buffer = deque(maxlen=30)
@@ -232,6 +253,37 @@ with mp_pose.Pose(
                 
                 # Display control data
                 draw_control_overlay(image, arm_data, finger_data, handedness, w, h)
+            # After you calculate arm_data and finger_data
+        
+        # Map wrist position to robot workspace
+            robot_x = (arm_data['wrist']['x'] / w - 0.5) * 0.6
+            robot_y = 0.2 + (arm_data['wrist']['y'] / h - 0.5) * 0.4
+            robot_z = 0.2 + arm_data['wrist']['z'] / h * 0.2
+            
+            # Clamp to safe ranges
+            robot_x = np.clip(robot_x, -0.4, 0.4)
+            robot_y = np.clip(robot_y, 0.0, 0.5)
+            robot_z = np.clip(robot_z, 0.05, 0.5)
+            
+            # Update IK (every 5 frames to avoid lag)
+            if len(fps_buffer) % 5 == 0:
+                target_position = [robot_x, robot_y, robot_z]
+                old_position = ik.copy()
+                ik = my_chain.inverse_kinematics(
+                    target_position, 
+                    target_orientation, 
+                    orientation_mode="Y", 
+                    initial_position=old_position
+                )
+                
+                # Update plot
+                ax.cla()
+                my_chain.plot(ik, ax, target=target_position)
+                ax.set_xlim(-0.5, 0.5)
+                ax.set_ylim(-0.5, 0.5)
+                ax.set_zlim(0, 0.6)
+                fig.canvas.draw_idle()
+                plt.pause(0.001)
         
         # Calculate FPS
         c_time = time.time()
@@ -249,6 +301,7 @@ with mp_pose.Pose(
         
         # Display the image
         cv2.imshow('Elbow + Hand Tracking', image)
+        cv2.setWindowProperty('Elbow + Hand Tracking', cv2.WND_PROP_TOPMOST, 1)
         
         
         key = cv2.waitKey(1) & 0xFF
