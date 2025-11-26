@@ -36,13 +36,13 @@ p_time = 0
 root=tk.Tk()
 
 #get user's resolution
-s_width=root.winfo_screenwidth()
-s_height=root.winfo_screenheight()
+s_width=root.winfo_screenwidth()*45/100
+s_height=root.winfo_screenheight()*55/100
 
 # Initialize webcam
 cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, s_width*40/100)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, s_height*35/100)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, s_width)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, s_height)
 cap.set(cv2.CAP_PROP_FPS, 30)
 
 
@@ -63,9 +63,9 @@ recorded_data = []
 
 # Custom drawing specification - only draw arm landmarks
 ARM_LANDMARKS = [
-    mp_pose.PoseLandmark.LEFT_SHOULDER,
-    mp_pose.PoseLandmark.LEFT_ELBOW,
-    mp_pose.PoseLandmark.LEFT_WRIST,
+    # mp_pose.PoseLandmark.LEFT_SHOULDER,
+    # mp_pose.PoseLandmark.LEFT_ELBOW,
+    # mp_pose.PoseLandmark.LEFT_WRIST,
     mp_pose.PoseLandmark.RIGHT_SHOULDER,
     mp_pose.PoseLandmark.RIGHT_ELBOW,
     mp_pose.PoseLandmark.RIGHT_WRIST,
@@ -73,8 +73,8 @@ ARM_LANDMARKS = [
 
 # Define arm connections only
 ARM_CONNECTIONS = [
-    (mp_pose.PoseLandmark.LEFT_SHOULDER, mp_pose.PoseLandmark.LEFT_ELBOW),
-    (mp_pose.PoseLandmark.LEFT_ELBOW, mp_pose.PoseLandmark.LEFT_WRIST),
+    # (mp_pose.PoseLandmark.LEFT_SHOULDER, mp_pose.PoseLandmark.LEFT_ELBOW),
+    # (mp_pose.PoseLandmark.LEFT_ELBOW, mp_pose.PoseLandmark.LEFT_WRIST),
     (mp_pose.PoseLandmark.RIGHT_SHOULDER, mp_pose.PoseLandmark.RIGHT_ELBOW),
     (mp_pose.PoseLandmark.RIGHT_ELBOW, mp_pose.PoseLandmark.RIGHT_WRIST),
 ]
@@ -93,16 +93,11 @@ def smooth_coordinates(buffer, new_coord):
     buffer.append(new_coord)
     return np.mean(list(buffer), axis=0) if len(buffer) > 0 else new_coord
 
-def extract_arm_coordinates(landmarks, handedness, w, h):
+def extract_arm_coordinates(landmarks, w, h):
     """Extract and return arm coordinates for robotic control"""
-    if handedness == "Left":
-        shoulder = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER]
-        elbow = landmarks[mp_pose.PoseLandmark.LEFT_ELBOW]
-        wrist = landmarks[mp_pose.PoseLandmark.LEFT_WRIST]
-    else:
-        shoulder = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER]
-        elbow = landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW]
-        wrist = landmarks[mp_pose.PoseLandmark.RIGHT_WRIST]
+    shoulder = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER]
+    elbow = landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW]
+    wrist = landmarks[mp_pose.PoseLandmark.RIGHT_WRIST]
 
     shoulder_coords = np.array([shoulder.x * w, shoulder.y * h, shoulder.z * h])
     elbow_coords = np.array([elbow.x * w, elbow.y * h, elbow.z * h])
@@ -156,7 +151,7 @@ def draw_arm_landmarks(image, landmarks, w, h):
         cv2.circle(image, (x, y), 8, (0, 0, 255), -1)
         cv2.circle(image, (x, y), 10, (255, 255, 255), 2)
 
-def draw_control_overlay(image, arm_data, finger_data, handedness, w, h):
+def draw_control_overlay(image, arm_data, finger_data, w, h):
     """Draw clean overlay showing current control data"""
     # Semi-transparent background
     overlay = image.copy()
@@ -164,7 +159,7 @@ def draw_control_overlay(image, arm_data, finger_data, handedness, w, h):
     cv2.addWeighted(overlay, 0.3, image, 0.7, 0, image)
     
     # Header
-    cv2.putText(image, f"ROBOT CONTROL - {handedness.upper()}", (20, 35),
+    cv2.putText(image, f"ROBOT CONTROL - Left", (20, 35),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
     
     y = 60
@@ -185,17 +180,19 @@ def draw_control_overlay(image, arm_data, finger_data, handedness, w, h):
         cv2.putText(image, text, (20, y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
         y += 18
 
+cv2.namedWindow('Elbow + Hand Tracking')
+cv2.setWindowProperty('Elbow + Hand Tracking', cv2.WND_PROP_TOPMOST, 1)
 # Configure MediaPipe Pose and Hands
 with mp_pose.Pose(
     model_complexity=1,
     smooth_landmarks=True,
-    min_detection_confidence=0.7,
-    min_tracking_confidence=0.7) as pose, \
+    min_detection_confidence=0.6,
+    min_tracking_confidence=0.6) as pose, \
      mp_hands.Hands(
     static_image_mode=False,
     max_num_hands=1,
-    min_detection_confidence=0.7,
-    min_tracking_confidence=0.7) as hands:
+    min_detection_confidence=0.6,
+    min_tracking_confidence=0.6) as hands:
 
     p_time = time.time()
     print("=" * 50)
@@ -203,8 +200,8 @@ with mp_pose.Pose(
     print("=" * 50)
     print("Controls:")
     print("  Q/ESC - Quit")
-    print("  R - Toggle recording")
-    print("  S - Save recorded data")
+    # print("  R - Toggle recording")
+    # print("  S - Save recorded data")
     print("=" * 50)
     
     while cap.isOpened():
@@ -223,7 +220,6 @@ with mp_pose.Pose(
         # Process the image
         pose_results = pose.process(image_rgb)
         hand_results = hands.process(image_rgb)
-        
         # Get image dimensions
         h, w, c = image.shape
         
@@ -248,42 +244,42 @@ with mp_pose.Pose(
                 handedness = hand_results.multi_handedness[hand_idx].classification[0].label
 
                 # Extract coordinates
-                arm_data = extract_arm_coordinates(landmarks, handedness, w, h)
-                finger_data = extract_finger_coordinates(hand_landmarks, w, h)
+                if handedness == 'Left':
+                    arm_data = extract_arm_coordinates(landmarks, w, h)
+                    finger_data = extract_finger_coordinates(hand_landmarks, w, h)
                 
-                # Display control data
-                draw_control_overlay(image, arm_data, finger_data, handedness, w, h)
-            # After you calculate arm_data and finger_data
-        
-        # Map wrist position to robot workspace
-            robot_x = (arm_data['wrist']['x'] / w - 0.5) * 0.6
-            robot_y = 0.2 + (arm_data['wrist']['y'] / h - 0.5) * 0.4
-            robot_z = 0.2 + arm_data['wrist']['z'] / h * 0.2
+                    # Display control data
+                    draw_control_overlay(image, arm_data, finger_data, w, h)
             
-            # Clamp to safe ranges
-            robot_x = np.clip(robot_x, -0.4, 0.4)
-            robot_y = np.clip(robot_y, 0.0, 0.5)
-            robot_z = np.clip(robot_z, 0.05, 0.5)
-            
-            # Update IK (every 5 frames to avoid lag)
-            if len(fps_buffer) % 5 == 0:
-                target_position = [robot_x, robot_y, robot_z]
-                old_position = ik.copy()
-                ik = my_chain.inverse_kinematics(
-                    target_position, 
-                    target_orientation, 
-                    orientation_mode="Y", 
-                    initial_position=old_position
-                )
-                
-                # Update plot
-                ax.cla()
-                my_chain.plot(ik, ax, target=target_position)
-                ax.set_xlim(-0.5, 0.5)
-                ax.set_ylim(-0.5, 0.5)
-                ax.set_zlim(0, 0.6)
-                fig.canvas.draw_idle()
-                plt.pause(0.001)
+                    # Map wrist position to robot workspace
+                    robot_x = (arm_data['wrist']['x'] / w - 0.5) * 0.6
+                    robot_y = 0.2 + (arm_data['wrist']['y'] / h - 0.5) * 0.4
+                    robot_z = 0.2 + arm_data['wrist']['z'] / h * 0.2
+                    
+                    # Clamp to safe ranges
+                    robot_x = np.clip(robot_x, -0.4, 0.4)
+                    robot_y = np.clip(robot_y, 0.0, 0.5)
+                    robot_z = np.clip(robot_z, 0.05, 0.5)
+                    
+                    # Update IK (every 5 frames to avoid lag)
+                    if len(fps_buffer) % 5 == 0:
+                        target_position = [robot_x, robot_y, robot_z]
+                        old_position = ik.copy()
+                        ik = my_chain.inverse_kinematics(
+                            target_position, 
+                            target_orientation, 
+                            orientation_mode="Y", 
+                            initial_position=old_position
+                        )
+                        
+                        # Update plot
+                        ax.cla()
+                        my_chain.plot(ik, ax, target=target_position)
+                        ax.set_xlim(-0.5, 0.5)
+                        ax.set_ylim(-0.5, 0.5)
+                        ax.set_zlim(0, 0.6)
+                        fig.canvas.draw_idle()
+                        plt.pause(0.001)
         
         # Calculate FPS
         c_time = time.time()
@@ -300,17 +296,15 @@ with mp_pose.Pose(
             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         
         # Display the image
-        cv2.imshow('Elbow + Hand Tracking', image)
-        cv2.setWindowProperty('Elbow + Hand Tracking', cv2.WND_PROP_TOPMOST, 1)
-        
+        cv2.imshow('Elbow + Hand Tracking', image)        
         
         key = cv2.waitKey(1) & 0xFF
         # Exit on 'q', 'esc' key
         if key == ord('q') or key == ord('Q') or key == 27:
             break
-        elif key == ord('r') or key == ord('R'): # Toggle recording
-            RECORD_DATA = not RECORD_DATA
-            print(f"Recording: {'ON' if RECORD_DATA else 'OFF'}")
+        # elif key == ord('r') or key == ord('R'): # Toggle recording
+        #     RECORD_DATA = not RECORD_DATA
+        #     print(f"Recording: {'ON' if RECORD_DATA else 'OFF'}")
         # elif key == ord('s') or key == ord('S'): # Save recorded data
         #     if recorded_data:
         #         filename = f"robot_data_{int(time.time())}.json"
