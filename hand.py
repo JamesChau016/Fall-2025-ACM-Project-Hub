@@ -252,7 +252,7 @@ with mp_pose.Pose(
                     draw_control_overlay(image, arm_data, finger_data, w, h)
             
                     # Map wrist position to robot workspace
-                    robot_x = (arm_data['wrist']['x'] / w - 0.5) * 0.6
+                    robot_x = (0.5 - arm_data['wrist']['x'] / w - 0.5) * 0.6
                     robot_y = 0.2 + (arm_data['wrist']['y'] / h - 0.5) * 0.4
                     robot_z = 0.2 + arm_data['wrist']['z'] / h * 0.2
                     
@@ -260,6 +260,17 @@ with mp_pose.Pose(
                     robot_x = np.clip(robot_x, -0.4, 0.4)
                     robot_y = np.clip(robot_y, 0.0, 0.5)
                     robot_z = np.clip(robot_z, 0.05, 0.5)
+
+                    # Calculate average finger position (exclude thumb)
+                    avg_finger_x = np.mean([finger_data[f]['x'] for f in ['index', 'middle', 'ring', 'pinky']])
+                    avg_finger_y = np.mean([finger_data[f]['y'] for f in ['index', 'middle', 'ring', 'pinky']])
+                    avg_finger_z = np.mean([finger_data[f]['z'] for f in ['index', 'middle', 'ring', 'pinky']])
+
+                    thumb_x = finger_data['thumb']['x']
+                    thumb_y = finger_data['thumb']['y']
+                    thumb_z = finger_data['thumb']['z']
+
+
                     
                     # Update IK (every 5 frames to avoid lag)
                     if len(fps_buffer) % 5 == 0:
@@ -271,6 +282,14 @@ with mp_pose.Pose(
                             orientation_mode="Y", 
                             initial_position=old_position
                         )
+                        # Map to robot coordinates
+                        finger_robot_x = (0.5 - avg_finger_x / w) * 0.6
+                        finger_robot_y = 0.2 + (avg_finger_y / h - 0.5) * 0.4
+                        finger_robot_z = 0.2 + avg_finger_z / h * 0.2
+
+                        thumb_robot_x = (0.5 - thumb_x / w) * 0.6
+                        thumb_robot_y = 0.2 + (thumb_y / h - 0.5) * 0.4
+                        thumb_robot_z = 0.2 + thumb_z / h * 0.2
                         
                         # Update plot
                         ax.cla()
@@ -278,6 +297,11 @@ with mp_pose.Pose(
                         ax.set_xlim(-0.5, 0.5)
                         ax.set_ylim(-0.5, 0.5)
                         ax.set_zlim(0, 0.6)
+                        # Draw on plot
+                        ax.scatter([finger_robot_x], [finger_robot_y], [finger_robot_z], 
+                                c='yellow', s=100, marker='o', label='Finger Average')
+                        ax.scatter([thumb_robot_x], [thumb_robot_y], [thumb_robot_z], 
+                                c='cyan', s=100, marker='o', label='Thumb')
                         fig.canvas.draw_idle()
                         plt.pause(0.001)
         
